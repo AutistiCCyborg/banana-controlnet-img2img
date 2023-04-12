@@ -21,8 +21,7 @@ def init():
         safety_checker=None,
         torch_dtype=torch.float16)
     context = {
-        "model": model,
-        "controlnet": controlnet,
+        "model": model
     }
 
     return context
@@ -33,7 +32,7 @@ def handler(context: dict, request: Request) -> Response:
     model_inputs = request.json
     model = context.get("model")
     controlnet = context.get("controlnet")
-    outputs = inference(model, controlnet, model_inputs)
+    outputs = inference(model, model_inputs)
 
     return Response(json={"outputs": outputs}, status=200)
 
@@ -42,7 +41,7 @@ def handler(context: dict, request: Request) -> Response:
 # Reference your preloaded global model variable here.
 
 
-def inference(model, controlnet, model_inputs: dict) -> dict:
+def inference(model, model_inputs: dict) -> dict:
 
     # Parse out your arguments
     prompt = model_inputs.get('prompt', None)
