@@ -7,19 +7,30 @@ from io import BytesIO
 from diffusers.utils import load_image
 from diffusers import UniPCMultistepScheduler, StableDiffusionControlNetPipeline, ControlNetModel
 from potassium import Potassium, Request, Response
+from torchvision import transforms
+
 
 app = Potassium("my_app")
 
 
 @app.init
 def init():
+    dev = "cuda:0" if torch.cuda.is_available() else "cpu"
+    print(f"using device {dev}")
+    device = torch.device(dev)
+
     controlnet = ControlNetModel.from_pretrained(
         "lllyasviel/sd-controlnet-canny", torch_dtype=torch.float16)
     model = StableDiffusionControlNetPipeline.from_pretrained(
         "runwayml/stable-diffusion-v1-5",
         controlnet=controlnet,
         safety_checker=None,
-        torch_dtype=torch.float16)
+        torch_dtype=torch.float16).to(device)
+    model.scheduler = UniPCMultistepScheduler.from_config(
+        model.scheduler.config)
+    # https://github.com/huggingface/diffusers/issues/2907
+    model.enable_model_cpu_offload()
+    model.enable_xformers_memory_efficient_attention()
     context = {
         "model": model
     }
@@ -33,7 +44,7 @@ def handler(context: dict, request: Request) -> Response:
     model = context.get("model")
     controlnet = context.get("controlnet")
     outputs = inference(model, model_inputs)
-
+    
     return Response(json={"outputs": outputs}, status=200)
 
 
@@ -42,6 +53,7 @@ def handler(context: dict, request: Request) -> Response:
 
 
 def inference(model, model_inputs: dict) -> dict:
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Parse out your arguments
     prompt = model_inputs.get('prompt', None)
@@ -65,14 +77,11 @@ def inference(model, model_inputs: dict) -> dict:
     canny_image.save(buffered, format="JPEG")
     canny_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-    model.scheduler = UniPCMultistepScheduler.from_config(
-        model.scheduler.config)
-    model.enable_model_cpu_offload()
-    model.enable_xformers_memory_efficient_attention()
+   
     output = model(prompt,
                    canny_image,
                    negative_prompt=negative_prompt,
-                   num_inference_steps=20)
+                   num_inference_steps=5,)
 
     image = output.images[0]
     buffered = BytesIO()
