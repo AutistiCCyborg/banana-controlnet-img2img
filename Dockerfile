@@ -4,7 +4,7 @@ FROM pytorch/pytorch:1.13.1-cuda11.6-cudnn8-runtime
 WORKDIR /
 
 # Install git
-# RUN apt-get update && apt-get install -y git ffmpeg libsm6 libxext6
+RUN apt-get update && apt-get install -y git ffmpeg libsm6 libxext6
 
 # Install python packages
 RUN pip3 install --upgrade pip
